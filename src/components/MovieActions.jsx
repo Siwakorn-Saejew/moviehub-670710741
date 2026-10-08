@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { putVote, addToWishlist, removeFromWishlist } from '../api/backend';
+import { putVote, getWishlist, addToWishlist, removeFromWishlist } from '../api/backend';
 
 // แถบปุ่มใต้ชื่อหนัง: ให้คะแนน 1 ถึง 10 และปุ่มเพิ่มเข้า wishlist (ต้อง login)
 function MovieActions({ movieId }) {
@@ -9,6 +9,31 @@ function MovieActions({ movieId }) {
   const [myScore, setMyScore] = useState(null);
   const [inWishlist, setInWishlist] = useState(false);
   const [message, setMessage] = useState(null);
+  const [wishlistStatus, setWishlistStatus] = useState('loading');
+
+  useEffect(() => {
+    if (!isLoggedIn || !token) return undefined;
+
+    let ignore = false;
+    setWishlistStatus('loading');
+    setMessage(null);
+
+    getWishlist(token)
+      .then(({ items }) => {
+        if (!ignore) {
+          setInWishlist(items.some(item => Number(item.id) === Number(movieId)));
+          setWishlistStatus('success');
+        }
+      })
+      .catch(err => {
+        if (!ignore) {
+          setMessage(err.message);
+          setWishlistStatus('error');
+        }
+      });
+
+    return () => { ignore = true; };
+  }, [isLoggedIn, movieId, token]);
 
   if (!isLoggedIn) {
     return (
@@ -56,10 +81,12 @@ function MovieActions({ movieId }) {
           </button>
         ))}
       </div>
-      <button onClick={handleWishlist}
+      <button onClick={handleWishlist} disabled={wishlistStatus === 'loading'}
               className={'rounded-lg border px-4 py-2 text-sm ' +
-                (inWishlist ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-emerald-200 bg-white text-slate-600 hover:bg-emerald-50')}>
-        {inWishlist ? '❤️ อยู่ในรายการที่อยากดูแล้ว' : '🤍 เพิ่มเข้ารายการที่อยากดู'}
+                (inWishlist ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-emerald-200 bg-white text-slate-600 hover:bg-emerald-50') +
+                (wishlistStatus === 'loading' ? ' cursor-wait opacity-60' : '')}>
+        {wishlistStatus === 'loading' ? 'กำลังตรวจสอบรายการ...' :
+          inWishlist ? '❤️ อยู่ในรายการที่อยากดูแล้ว' : '🤍 เพิ่มเข้ารายการที่อยากดู'}
       </button>
       {message && <p className="text-sm text-slate-500">{message}</p>}
     </div>
